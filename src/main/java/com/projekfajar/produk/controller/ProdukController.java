@@ -196,38 +196,39 @@ public class ProdukController {
         }
     }
 
+    /**
+     * Exception sengaja dibiarkan naik ke GlobalExceptionHandler.
+     *
+     * Sebelumnya method ini membungkus seluruh isinya dengan catch(Exception)
+     * dan membalas 500 "Gagal membuat produk" untuk apa pun yang terjadi —
+     * termasuk penolakan hak akses dan karat yang tidak sah, yang seharusnya
+     * 403 dan 400. Akibatnya admin hanya melihat pesan buram tanpa petunjuk
+     * apa yang perlu diperbaiki.
+     */
     @PostMapping
     public ResponseEntity<Map<String, Object>> createProduk(
             @Valid @RequestBody ProdukRequest request,
             Authentication authentication) {
-        try {
-            requireAdmin(authentication);
+        requireAdmin(authentication);
 
-            log.info("POST /api/produk nama={} harga={} stock={}",
-                    request.getNama(), request.getHarga(), request.getStock());
+        log.info("POST /api/produk nama={} harga={} stock={}",
+                request.getNama(), request.getHarga(), request.getStock());
 
-            if (gambarRequestTidakValid(request)) {
-                log.warn("Create product rejected: invalid image URL for nama={}", request.getNama());
-                return ResponseEntity.badRequest()
-                        .body(Map.of(
-                                "success", false,
-                                "message", "Gambar harus berupa URL yang valid. Gunakan endpoint /api/produk/upload-image untuk upload gambar terlebih dahulu."));
-            }
-            
-            ProdukResponse produk = produkService.createProduk(request);
-            log.info("Product created: id={} nama={}", produk.getId(), produk.getNama());
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(Map.of(
-                            "success", true,
-                            "message", "Produk berhasil dibuat",
-                            "data", produk));
-        } catch (Exception e) {
-            log.error("Failed to create product nama={}: {}", request.getNama(), e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+        if (gambarRequestTidakValid(request)) {
+            log.warn("Create product rejected: invalid image URL for nama={}", request.getNama());
+            return ResponseEntity.badRequest()
                     .body(Map.of(
                             "success", false,
-                            "message", "Gagal membuat produk"));
+                            "message", "Gambar harus berupa URL yang valid. Gunakan endpoint /api/produk/upload-image untuk upload gambar terlebih dahulu."));
         }
+
+        ProdukResponse produk = produkService.createProduk(request);
+        log.info("Product created: id={} nama={}", produk.getId(), produk.getNama());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(Map.of(
+                        "success", true,
+                        "message", "Produk berhasil dibuat",
+                        "data", produk));
     }
 
     @PutMapping("/{id}")
