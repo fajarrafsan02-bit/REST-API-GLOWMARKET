@@ -1,20 +1,16 @@
 package com.projekfajar.auth.service;
 
-import org.springframework.mail.MailException;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 
-import com.projekfajar.exception.EmailSendException;
 import com.projekfajar.pesanan.model.AlamatSnapshot;
 import com.projekfajar.pesanan.model.OrderStatus;
 import com.projekfajar.pesanan.model.Pesanan;
 import com.projekfajar.pesanan.model.PesananItem;
 
-import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -23,8 +19,14 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class EmailService {
 
-    private final JavaMailSender javaMailSender;
+    // Jalur pengiriman ditentukan app.email.provider: SMTP untuk lokal,
+    // HTTP API untuk produksi yang memblokir port SMTP.
+    private final EmailSender emailSender;
     private final EmailTemplate template;
+
+    /** Penerima pesan dari formulir kontak. */
+    @Value("${app.email.admin:${app.email.from:}}")
+    private String adminEmail;
 
     /**
      * Kode verifikasi kepemilikan email saat registrasi.
@@ -195,23 +197,7 @@ public class EmailService {
 
     /** Satu jalur pengiriman untuk semua email HTML. */
     private void kirim(String tujuan, String subjek, String htmlBody) {
-        try {
-            MimeMessage message = javaMailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
-            helper.setTo(tujuan);
-            helper.setSubject(subjek);
-            helper.setText(htmlBody, true);
-
-            javaMailSender.send(message);
-            log.info("Email '{}' terkirim ke {}", subjek, tujuan);
-        } catch (MailException e) {
-            log.error("Gagal mengirim email '{}' ke {}: {}", subjek, tujuan, e.getMessage());
-            throw new EmailSendException("Gagal mengirim email ke " + tujuan, e);
-        } catch (Exception e) {
-            log.error("Kesalahan tak terduga saat mengirim email ke {}: {}", tujuan, e.getMessage(), e);
-            throw new EmailSendException("Terjadi kesalahan saat mengirim email", e);
-        }
+        emailSender.kirim(tujuan, subjek, htmlBody);
     }
 
     /**
@@ -241,14 +227,7 @@ public class EmailService {
             throw new IllegalArgumentException("Format email tidak valid");
         }
 
-        try {
-            MimeMessage message = javaMailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
-            helper.setTo(email);
-            helper.setSubject("Token Login Admin - " + template.namaToko());
-
-            String htmlContent = String.format("""
+        String htmlContent = String.format("""
                     <!DOCTYPE html>
                     <html>
                     <head>
@@ -300,17 +279,8 @@ public class EmailService {
                     </html>
                     """, template.namaToko(), otp, template.namaToko());
 
-            helper.setText(htmlContent, true); // true = HTML
-
-            javaMailSender.send(message);
-            log.info("OTP email HTML terkirim ke: {}", email);
-        } catch (MailException e) {
-            log.error("Failed to send OTP email to {}: {}", email, e.getMessage(), e);
-            throw new EmailSendException("Gagal mengirim email. Silakan periksa koneksi internet Anda.", e);
-        } catch (Exception e) {
-            log.error("Unexpected error sending OTP email: {}", e.getMessage(), e);
-            throw new EmailSendException("Terjadi kesalahan saat mengirim email: " + e.getMessage(), e);
-        }
+        emailSender.kirim(email, "Token Login Admin - " + template.namaToko(), htmlContent);
+        log.info("OTP email HTML terkirim ke: {}", email);
     }
     
     public void sendContactEmail(String senderName, String senderEmail, String senderPhone, String message) {
@@ -335,16 +305,7 @@ public class EmailService {
             throw new IllegalArgumentException("Pesan tidak boleh kosong");
         }
         
-        try {
-            MimeMessage mimeMessage = javaMailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
-            
-            // Send to admin email (fajar.rafsan02@gmail.com)
-            helper.setTo("fajar.rafsan02@gmail.com");
-            helper.setSubject("Pesan Kontak Baru dari " + senderName);
-            helper.setReplyTo(senderEmail); // Set reply-to as sender's email
-            
-            String htmlContent = String.format("""
+        String htmlContent = String.format("""
                     <!DOCTYPE html>
                     <html>
                     <head>
@@ -415,18 +376,10 @@ public class EmailService {
                     java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")),
                     template.namaToko()
             );
-            
-            helper.setText(htmlContent, true); // true = HTML
-            
-            javaMailSender.send(mimeMessage);
-            log.info("Contact email sent successfully from: {} ({})", senderName, senderEmail);
-            
-        } catch (MailException e) {
-            log.error("Failed to send contact email: {}", e.getMessage(), e);
-            throw new EmailSendException("Gagal mengirim email. Silakan coba lagi.", e);
-        } catch (Exception e) {
-            log.error("Unexpected error sending contact email: {}", e.getMessage(), e);
-            throw new EmailSendException("Terjadi kesalahan saat mengirim email: " + e.getMessage(), e);
-        }
+
+        // Balasan diarahkan ke pengirim asli supaya admin bisa langsung
+        // membalas dari kotak masuknya.
+        emailSender.kirim(adminEmail, "Pesan Kontak Baru dari " + senderName, htmlContent, senderEmail);
+        log.info("Contact email sent successfully from: {} ({})", senderName, senderEmail);
     }
 }

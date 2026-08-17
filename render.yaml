@@ -43,6 +43,18 @@ services:
       - key: APP_FRONTEND_URL
         sync: false
 
+      # ---- Email ----
+      # Render memblokir port SMTP keluar (25/465/587), jadi email harus
+      # berangkat lewat HTTP API di port 443.
+      - key: EMAIL_PROVIDER
+        value: brevo
+      - key: BREVO_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: EMAIL_ADMIN
+        sync: false
+
       # ---- Kredensial layanan pihak ketiga ----
       - key: MAIL_USERNAME
         sync: false
