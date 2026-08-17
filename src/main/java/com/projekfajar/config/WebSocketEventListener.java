@@ -1,7 +1,7 @@
 package com.projekfajar.config;
 
-import com.projekfajar.services.OnlineUserTracker;
-import com.projekfajar.util.JwtUtil;
+import com.projekfajar.chat.service.OnlineUserTracker;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
@@ -10,16 +10,20 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.socket.messaging.SessionConnectEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
+/**
+ * userId/role sekarang datang dari session attributes yang diisi
+ * WsHandshakeInterceptor saat handshake — bukan dengan mem-parse ulang token
+ * dari header STOMP seperti sebelumnya (dua tempat mem-parse token yang sama
+ * dengan cara berbeda adalah sumber bug yang gampang diam-diam berbeda hasil).
+ */
 @Component
 public class WebSocketEventListener {
 
     private static final Logger logger = LoggerFactory.getLogger(WebSocketEventListener.class);
 
-    private final JwtUtil jwtUtil;
     private final OnlineUserTracker onlineUserTracker;
 
-    public WebSocketEventListener(JwtUtil jwtUtil, OnlineUserTracker onlineUserTracker) {
-        this.jwtUtil = jwtUtil;
+    public WebSocketEventListener(OnlineUserTracker onlineUserTracker) {
         this.onlineUserTracker = onlineUserTracker;
     }
 
@@ -27,31 +31,22 @@ public class WebSocketEventListener {
     public void handleSessionConnected(SessionConnectEvent event) {
         StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
         String sessionId = accessor.getSessionId();
-        String token = accessor.getFirstNativeHeader("Authorization");
 
-        if (token == null || !token.startsWith("Bearer ")) {
-            logger.warn("WebSocket CONNECT without valid Authorization header, sessionId={}", sessionId);
+        if (accessor.getSessionAttributes() == null) {
+            logger.warn("WebSocket CONNECT tanpa session attributes, sessionId={}", sessionId);
             return;
         }
 
-        token = token.substring(7);
+        Object userIdAttr = accessor.getSessionAttributes().get(WsHandshakeInterceptor.ATTR_USER_ID);
+        Object roleAttr = accessor.getSessionAttributes().get(WsHandshakeInterceptor.ATTR_ROLE);
 
-        try {
-            Long userId = jwtUtil.extractUserId(token);
-            String role = jwtUtil.extractClaim(token, claims -> {
-                Object r = claims.get("role");
-                return r != null ? r.toString() : null;
-            });
-
-            if (userId == null) {
-                logger.warn("Cannot extract userId from JWT on CONNECT, sessionId={}", sessionId);
-                return;
-            }
-
-            onlineUserTracker.userConnected(userId, sessionId, role);
-        } catch (Exception e) {
-            logger.error("Failed to process WebSocket connect event: {}", e.getMessage(), e);
+        if (!(userIdAttr instanceof Long userId)) {
+            logger.warn("WebSocket CONNECT tanpa userId (handshake seharusnya sudah menolaknya), sessionId={}",
+                    sessionId);
+            return;
         }
+
+        onlineUserTracker.userConnected(userId, sessionId, roleAttr != null ? roleAttr.toString() : null);
     }
 
     @EventListener

@@ -1,7 +1,8 @@
 package com.projekfajar.config;
 
-import com.projekfajar.util.JwtUtil;
-import lombok.RequiredArgsConstructor;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -13,13 +14,12 @@ import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
-import java.util.ArrayList;
+import lombok.RequiredArgsConstructor;
 
 @Configuration
 @EnableWebSocketMessageBroker
@@ -27,12 +27,16 @@ import java.util.ArrayList;
 @RequiredArgsConstructor
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
-    private final JwtUtil jwtUtil;
+    private final WsHandshakeInterceptor wsHandshakeInterceptor;
+
+    @Value("${app.cors.allowed-origins:http://localhost:5173}")
+    private List<String> allowedOrigins;
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
-                .setAllowedOrigins("http://localhost:5173")
+                .setAllowedOrigins(allowedOrigins.toArray(new String[0]))
+                .addInterceptors(wsHandshakeInterceptor)
                 .withSockJS();
     }
 
@@ -42,31 +46,25 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         registry.setApplicationDestinationPrefixes("/app");
         registry.setUserDestinationPrefix("/user");
     }
-    
+
+    /**
+     * Autentikasi sudah selesai di WsHandshakeInterceptor saat handshake HTTP —
+     * di sini tinggal mengambil hasilnya dari session attributes (disalin Spring
+     * dari attributes handshake) dan menempelkannya sebagai Principal STOMP.
+     * Kalau tidak ada, berarti handshake sudah menolak koneksi ini lebih dulu.
+     */
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
         registration.interceptors(new ChannelInterceptor() {
             @Override
             public Message<?> preSend(Message<?> message, MessageChannel channel) {
                 StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
-                
-                if (StompCommand.CONNECT.equals(accessor.getCommand())) {
-                    String token = accessor.getFirstNativeHeader("Authorization");
-                    
-                    if (token != null && token.startsWith("Bearer ")) {
-                        token = token.substring(7);
-                        
-                        try {
-                            String email = jwtUtil.extractUsername(token);
-                            if (email != null && !jwtUtil.isTokenExpired(token)) {
-                                UsernamePasswordAuthenticationToken authentication = 
-                                    new UsernamePasswordAuthenticationToken(email, null, new ArrayList<>());
-                                SecurityContextHolder.getContext().setAuthentication(authentication);
-                                accessor.setUser(authentication);
-                            }
-                        } catch (Exception e) {
-                            // Invalid token - connection will be rejected
-                        }
+
+                if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())
+                        && accessor.getSessionAttributes() != null) {
+                    Object authentication = accessor.getSessionAttributes().get(WsHandshakeInterceptor.ATTR_AUTHENTICATION);
+                    if (authentication instanceof Authentication auth) {
+                        accessor.setUser(auth);
                     }
                 }
                 return message;

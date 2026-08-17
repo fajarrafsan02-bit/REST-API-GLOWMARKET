@@ -1,33 +1,62 @@
 package com.projekfajar.util;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.function.Function;
 
+import javax.crypto.SecretKey;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
-import com.projekfajar.models.User;
+import com.projekfajar.user.model.User;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 
 @Component
 public class JwtUtil {
-    private final String SECRET = "admin-secret-key-admin-secret-key";
+    private static final Logger logger = LoggerFactory.getLogger(JwtUtil.class);
+
+    @Value("${jwt.secret:}")
+    private String configuredSecret;
+
+    /** Access token: 30 menit. Sesi panjang lewat refresh token, bukan JWT ini. */
+    @Value("${jwt.access-expiration-ms:1800000}")
+    private long expirationMs;
+
+    private SecretKey signingKey;
+
+    @PostConstruct
+    void initSigningKey() {
+        if (configuredSecret == null || configuredSecret.trim().length() < 32) {
+            // Kunci acak per startup: aman, tapi semua token lama jadi tidak valid
+            // setiap aplikasi di-restart. Set JWT_SECRET agar sesi bertahan.
+            signingKey = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+            logger.warn("jwt.secret belum diset (atau kurang dari 32 karakter). "
+                    + "Memakai kunci acak sementara — semua user akan ter-logout setiap restart. "
+                    + "Set environment variable JWT_SECRET untuk produksi.");
+            return;
+        }
+
+        signingKey = Keys.hmacShaKeyFor(configuredSecret.getBytes(StandardCharsets.UTF_8));
+    }
 
     public String generateToken(User user) {
-        // Token expires in 7 days (604800000 ms = 7 * 24 * 60 * 60 * 1000)
-        // For development: 7 days, for production: consider 1 day (86400000)
         return Jwts.builder()
                 .setSubject(user.getEmail())
                 .claim("userId", user.getId())
                 .claim("role", user.getRole().name())
                 .claim("nama", user.getNamaLengkap())
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 604800000)) // 7 days
-                .signWith(Keys.hmacShaKeyFor(SECRET.getBytes()), SignatureAlgorithm.HS256)
+                .setExpiration(new Date(System.currentTimeMillis() + expirationMs))
+                .signWith(signingKey, SignatureAlgorithm.HS256)
                 .compact();
     }
 
@@ -59,7 +88,7 @@ public class JwtUtil {
 
     private Claims extractAllClaims(String token) {
         return Jwts.parserBuilder()
-                .setSigningKey(Keys.hmacShaKeyFor(SECRET.getBytes()))
+                .setSigningKey(signingKey)
                 .build()
                 .parseClaimsJws(token)
                 .getBody();

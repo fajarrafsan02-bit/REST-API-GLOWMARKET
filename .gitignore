@@ -31,3 +31,24 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Kredensial lokal (jangan di-commit) ###
+src/main/resources/application-local.properties
+.env
+.env.local
+
+### Log & crash dump ###
+*.log
+logs/
+hs_err_pid*.log
+replay_pid*.log
+
+### File yang diunggah pengguna (isi runtime, bukan kode) ###
+uploads/
+
+### OS ###
+.DS_Store
+Thumbs.db
+
+### Tooling GitHub Copilot modernize (artefak lokal) ###
+.github/modernize/

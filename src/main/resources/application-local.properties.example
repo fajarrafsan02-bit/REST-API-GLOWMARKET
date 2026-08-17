@@ -1,0 +1,28 @@
+# ============================================================
+# Template kredensial lokal.
+# Salin file ini menjadi application-local.properties lalu isi nilainya.
+# File asli tidak ikut ke Git.
+# ============================================================
+
+spring.datasource.password=
+
+spring.mail.username=
+spring.mail.password=
+
+cloudinary.cloud-name=
+cloudinary.api-key=
+cloudinary.api-secret=
+
+xendit.api-key=
+# Dashboard Xendit: Settings > Developers > Webhooks > Callback Verification Token
+xendit.callback-token=
+
+# Minimal 32 karakter
+jwt.secret=
+
+# RajaOngkir / Komerce — API Name: Shipping Cost
+rajaongkir.api-key=
+
+# Login Google — OAuth Client ID dari Google Cloud Console
+# (APIs & Services > Credentials). Client Secret tidak dipakai.
+google.oauth.client-id=

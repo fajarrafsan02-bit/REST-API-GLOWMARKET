@@ -44,9 +44,22 @@
 		</dependency>
 
 		<dependency>
-			<groupId>com.mysql</groupId>
-			<artifactId>mysql-connector-j</artifactId>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
 			<scope>runtime</scope>
+		</dependency>
+
+		<!-- Migrasi skema database: perubahan struktur tercatat sebagai file
+		     versi, bukan ditebak Hibernate saat startup.
+		     Di Spring Boot 4 auto-configuration Flyway ada di starter ini —
+		     memakai flyway-core saja membuat migrasi tidak pernah dijalankan. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-flyway</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-database-postgresql</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.projectlombok</groupId>
@@ -133,6 +146,13 @@
 			<groupId>org.springdoc</groupId>
 			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
 			<version>2.3.0</version>
+		</dependency>
+
+		<!-- Verifikasi ID token Login Google (GoogleIdTokenVerifier resmi) -->
+		<dependency>
+			<groupId>com.google.api-client</groupId>
+			<artifactId>google-api-client</artifactId>
+			<version>2.8.0</version>
 		</dependency>
 	</dependencies>
 
