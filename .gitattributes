@@ -1,2 +1,10 @@
 /mvnw text eol=lf
 *.cmd text eol=crlf
+
+# Skrip yang dijalankan di dalam kontainer Linux harus berakhiran LF. Bila
+# ikut terkonversi ke CRLF, shell membaca "\r" sebagai bagian dari nama
+# penerjemah dan gagal dengan pesan "no such file or directory" yang
+# menyesatkan.
+*.sh text eol=lf
+Dockerfile text eol=lf
+entrypoint.sh text eol=lf
