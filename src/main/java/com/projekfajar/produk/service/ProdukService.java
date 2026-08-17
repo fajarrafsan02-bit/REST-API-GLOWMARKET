@@ -98,6 +98,25 @@ public class ProdukService {
         }
     }
 
+    /**
+     * Menyelaraskan status dengan stok yang tersisa.
+     *
+     * Barang tanpa stok tidak boleh berlabel TERSEDIA — pembeli akan mengira
+     * bisa memesannya. Sebaliknya, TIDAK_TERSEDIA adalah keputusan admin untuk
+     * menyembunyikan produk, jadi tidak boleh ditimpa hanya karena stoknya
+     * kebetulan terisi.
+     */
+    private StatusProduk statusMenurutStok(Integer stok, StatusProduk diminta) {
+        StatusProduk status = diminta != null ? diminta : StatusProduk.TERSEDIA;
+
+        if (status == StatusProduk.TIDAK_TERSEDIA) {
+            return status;
+        }
+
+        int jumlah = stok != null ? stok : 0;
+        return jumlah <= 0 ? StatusProduk.HABIS : StatusProduk.TERSEDIA;
+    }
+
     @Transactional
     public ProdukResponse createProduk(ProdukRequest request) {
         validasiKaratEmas(request.getKaratEmas());
@@ -115,7 +134,7 @@ public class ProdukService {
                 .stock(request.getStock())
                 .karatEmas(request.getKaratEmas())
                 .beratGram(request.getBeratGram())
-                .status(request.getStatus() != null ? request.getStatus() : StatusProduk.TERSEDIA)
+                .status(statusMenurutStok(request.getStock(), request.getStatus()))
                 .createdAt(LocalDateTime.now())
                 .build();
 
@@ -158,7 +177,9 @@ public class ProdukService {
         produk.setKaratEmas(request.getKaratEmas());
         produk.setBeratGram(request.getBeratGram());
         if (request.getStatus() != null) {
-            produk.setStatus(request.getStatus());
+            // Stoknya sengaja dibaca dari entity, bukan dari request: nilai di
+            // request diabaikan pada pembaruan (lihat catatan di atas).
+            produk.setStatus(statusMenurutStok(produk.getStock(), request.getStatus()));
         }
         produk.setUpdatedAt(LocalDateTime.now());
 
@@ -234,12 +255,7 @@ public class ProdukService {
         produk.setStock(stock);
         produk.setUpdatedAt(LocalDateTime.now());
 
-        // Auto update status based on stock
-        if (stock == 0) {
-            produk.setStatus(StatusProduk.HABIS);
-        } else if (produk.getStatus() == StatusProduk.HABIS) {
-            produk.setStatus(StatusProduk.TERSEDIA);
-        }
+        produk.setStatus(statusMenurutStok(stock, produk.getStatus()));
 
         Produk updatedProduk = produkRepository.save(produk);
         log.info("Product stock updated: id={} from={} to={} status={}",
