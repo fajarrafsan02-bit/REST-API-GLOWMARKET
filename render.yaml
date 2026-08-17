@@ -22,6 +22,16 @@ services:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
 
+      # ---- Cookie autentikasi ----
+      # Disetel eksplisit, tidak mengandalkan profil prod saja: bila
+      # SPRING_PROFILES_ACTIVE gagal terbaca, aplikasi jatuh ke default Lax
+      # dan browser menolak menyimpan cookie lintas domain (Vercel -> Render),
+      # sehingga login selalu tampak gagal dengan 401 di /auth/refresh.
+      - key: AUTH_COOKIE_SAME_SITE
+        value: None
+      - key: AUTH_COOKIE_SECURE
+        value: "true"
+
       # ---- Database (Supabase) ----
       # Salin "Connection string" mode Session Pooler dari Supabase:
       #   Project Settings > Database > Connection string > URI
