@@ -9,6 +9,15 @@ import org.aspectj.lang.annotation.Pointcut;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import com.projekfajar.exception.BusinessException;
+import com.projekfajar.exception.EmailNotFoundException;
+import com.projekfajar.exception.InvalidOtpException;
+import com.projekfajar.exception.InvalidPasswordException;
+import com.projekfajar.exception.OtpExpiredException;
+import com.projekfajar.exception.ProdukNotFoundException;
+import com.projekfajar.exception.ResourceNotFoundException;
+import com.projekfajar.exception.UnauthorizedAccessException;
+
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -41,15 +50,42 @@ public class LoggingAspect {
     }
 
     /**
-     * Exception yang lolos sampai ke luar service/controller selalu dicatat,
-     * lengkap dengan stacktrace — sekalipun pemanggilnya menelan error itu.
+     * Exception yang lolos sampai ke luar service/controller dicatat di sini,
+     * sekalipun pemanggilnya menelan error itu.
+     *
+     * Pelanggaran aturan bisnis sengaja dicatat tanpa stacktrace pada level
+     * WARN. Penolakan seperti sesi kedaluwarsa, OTP salah, atau stok habis
+     * adalah jalur normal yang terjadi setiap hari — mencetak seratusan baris
+     * stacktrace untuk tiap kejadian hanya menenggelamkan kesalahan sungguhan
+     * yang justru perlu dilihat.
      */
     @AfterThrowing(pointcut = "applicationPackagePointcut() && springBeanPointcut()", throwing = "e")
     public void logAfterThrowing(JoinPoint joinPoint, Throwable e) {
-        log.error("Exception in {}.{}(): {}",
-                joinPoint.getSignature().getDeclaringType().getSimpleName(),
-                joinPoint.getSignature().getName(),
-                e.getMessage(), e);
+        String kelas = joinPoint.getSignature().getDeclaringType().getSimpleName();
+        String method = joinPoint.getSignature().getName();
+
+        if (kegagalanTerduga(e)) {
+            log.warn("{}.{}() ditolak: {}", kelas, method, e.getMessage());
+            return;
+        }
+
+        log.error("Exception in {}.{}(): {}", kelas, method, e.getMessage(), e);
+    }
+
+    /**
+     * Menandai exception yang sudah punya arti bisnis dan penanganannya
+     * sendiri di GlobalExceptionHandler, sehingga bukan gejala kerusakan.
+     */
+    private boolean kegagalanTerduga(Throwable e) {
+        return e instanceof BusinessException
+                || e instanceof UnauthorizedAccessException
+                || e instanceof ResourceNotFoundException
+                || e instanceof ProdukNotFoundException
+                || e instanceof EmailNotFoundException
+                || e instanceof InvalidOtpException
+                || e instanceof InvalidPasswordException
+                || e instanceof OtpExpiredException
+                || e instanceof IllegalArgumentException;
     }
 
     /**
