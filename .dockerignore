@@ -1,0 +1,14 @@
+# Berkas yang tidak perlu masuk ke konteks build Docker.
+# Mempercepat build dan mencegah kredensial lokal ikut ter-copy.
+
+target/
+.git/
+.github/
+.vscode/
+.idea/
+uploads/
+logs/
+*.log
+src/main/resources/application-local.properties
+DOCUMENTATION.md
+README.md

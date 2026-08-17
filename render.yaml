@@ -1,0 +1,64 @@
+# Blueprint Render — https://render.com/docs/blueprint-spec
+#
+# Cara pakai:
+#   1. Push berkas ini ke GitHub.
+#   2. Render Dashboard > New > Blueprint > pilih repo ini.
+#   3. Isi environment variable yang ditandai sync:false pada dialog yang muncul
+#      (nilainya sengaja tidak disimpan di repo).
+#
+# Database berada di Supabase, di luar blueprint ini, supaya datanya tidak
+# ikut terhapus bila service Render dibongkar-pasang dan tidak terkena batas
+# 30 hari milik Postgres gratis Render.
+
+services:
+  - type: web
+    name: glowmarket-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    region: singapore
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+
+      # ---- Database (Supabase) ----
+      # Salin "Connection string" mode Session Pooler dari Supabase:
+      #   Project Settings > Database > Connection string > URI
+      # Bentuknya postgres://user:sandi@host:5432/postgres — entrypoint.sh
+      # mengubahnya ke format JDBC dan menambahkan sslmode=require.
+      # Username & password ikut terbaca dari URL itu, jadi tidak perlu
+      # diisi terpisah kecuali ingin menimpanya.
+      - key: DB_URL
+        sync: false
+
+      # ---- Kunci JWT: dibuat acak sekali oleh Render, lalu tetap ----
+      - key: JWT_SECRET
+        generateValue: true
+
+      # ---- Alamat frontend: WAJIB diisi dengan domain Vercel milik Anda ----
+      # Contoh: https://projek-react.vercel.app
+      - key: APP_CORS_ORIGINS
+        sync: false
+      - key: APP_FRONTEND_URL
+        sync: false
+
+      # ---- Kredensial layanan pihak ketiga ----
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: XENDIT_API_KEY
+        sync: false
+      - key: XENDIT_CALLBACK_TOKEN
+        sync: false
+      - key: RAJAONGKIR_API_KEY
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false

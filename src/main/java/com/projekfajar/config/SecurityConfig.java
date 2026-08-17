@@ -74,6 +74,8 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/**", "/uploads/**").permitAll()
+                        // Dipanggil platform hosting untuk memeriksa proses masih hidup
+                        .requestMatchers("/health").permitAll()
                         // Katalog boleh dibaca publik, tapi semua perubahan produk
                         // (tambah/ubah/hapus/stok/upload gambar) hanya untuk admin.
                         .requestMatchers(HttpMethod.GET, "/api/produk", "/api/produk/**").permitAll()

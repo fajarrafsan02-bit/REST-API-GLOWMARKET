@@ -33,6 +33,17 @@ public class AuthCookieService {
     @Value("${app.auth.cookie-secure:false}")
     private boolean cookieSecure;
 
+    /**
+     * Lax cukup selama frontend dan backend satu origin (dev memakai proxy
+     * Vite). Begitu keduanya beda domain — misalnya frontend di Vercel dan
+     * backend di Render — browser menganggap setiap request sebagai
+     * lintas-situs dan menahan cookie Lax, sehingga pengguna tampak tidak
+     * pernah berhasil login. Untuk kasus itu setel None, yang mensyaratkan
+     * Secure=true (HTTPS).
+     */
+    @Value("${app.auth.cookie-same-site:Lax}")
+    private String cookieSameSite;
+
     @Value("${jwt.access-expiration-ms:1800000}")
     private long accessExpirationMs;
 
@@ -87,7 +98,7 @@ public class AuthCookieService {
         return ResponseCookie.from(cookieName, nilai == null ? "" : nilai)
                 .httpOnly(true)
                 .secure(cookieSecure)
-                .sameSite("Lax")
+                .sameSite(cookieSameSite)
                 .path(PATH_ACCESS)
                 .maxAge(maxAge)
                 .build();
@@ -97,7 +108,7 @@ public class AuthCookieService {
         return ResponseCookie.from(refreshCookieName, nilai == null ? "" : nilai)
                 .httpOnly(true)
                 .secure(cookieSecure)
-                .sameSite("Lax")
+                .sameSite(cookieSameSite)
                 .path(PATH_REFRESH)
                 .maxAge(maxAge)
                 .build();
